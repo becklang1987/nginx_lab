@@ -1,0 +1,116 @@
+Resources:
+  VpcNginx:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: VPC_Nginx
+
+  SubnetNginx:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VpcNginx
+      CidrBlock: 10.0.1.0/24
+      Tags:
+        - Key: Name
+          Value: SubnetNginx
+
+  NginxSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow HTTP and SSH access
+      VpcId: !Ref VpcNginx
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: NginxSecurityGroup
+
+  NginxServer:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-0a0b7b240264a48d7
+      InstanceType: t2.micro
+      KeyName: my-key
+      NetworkInterfaces:
+        - DeviceIndex: 0
+          SubnetId: !Ref SubnetNginx
+          AssociatePublicIpAddress: true
+          GroupSet:
+            - !Ref NginxSecurityGroup
+      Tags:
+        - Key: Name
+          Value: NginxServer
+      UserData: !Base64 |
+        #!/bin/bash
+        echo "Hello, World!" > /var/www/html/index.html
+        apt update
+        apt install -y nginx
+        systemctl start nginx
+        systemctl enable nginx
+  NginxServer2:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-0a0b7b240264a48d7
+      InstanceType: t2.micro
+      KeyName: my-key
+      NetworkInterfaces:
+        - DeviceIndex: 0
+          SubnetId: !Ref SubnetNginx
+          AssociatePublicIpAddress: true
+          GroupSet:
+            - !Ref NginxSecurityGroup
+      Tags:
+        - Key: Name
+          Value: NginxServer
+      UserData: !Base64 |
+        #!/bin/bash
+        echo "Hello, World!" > /var/www/html/index.html
+        apt update
+        apt install -y nginx
+        systemctl start nginx
+        systemctl enable nginx
+
+  IgwNginx:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: IgwNginx
+
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VpcNginx
+      InternetGatewayId: !Ref IgwNginx
+
+  RouteTableNginx:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VpcNginx
+      Tags:
+        - Key: Name
+          Value: RouteTableNginx
+
+  RouteNginxDefault:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref RouteTableNginx
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref IgwNginx
+
+  RouteTableAssociationNginx:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref SubnetNginx
+      RouteTableId: !Ref RouteTableNginx
